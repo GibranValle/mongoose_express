@@ -2,6 +2,13 @@
 // express and ejs
 const express = require("express")
 const app = express()
+// to read from body
+const { urlencoded } = require("express")
+//get from POST with req.body
+app.use(urlencoded({ extended: true }))
+// RESTfull delete, updave http verbs
+const methodOverride = require("method-override")
+app.use(methodOverride("_method"))
 
 // router campground
 const campgroundsRouter = require('./routes/campgrounds')
@@ -14,22 +21,13 @@ const catchAsync = require("./utils/catchAsync")
 //joi
 const { campgroundSchema, reviewSchema } = require("./validationSchemas.js")
 
-//mongoose
-const mongoose = require("mongoose")
-const db = mongoose.connection
-
 // mongoose models
 const Campground = require("./models/campground")
 const Review = require("./models/review")
 
-// to read from body
-const { urlencoded } = require("express")
-//get from POST with req.body
-app.use(urlencoded({ extended: true }))
-// RESTfull delete, updave http verbs
-const methodOverride = require("method-override")
-app.use(methodOverride("_method"))
-
+//mongoose
+const mongoose = require("mongoose")
+const db = mongoose.connection
 const userName = 'admin'
 const password = 'admin'
 const dbName = 'test'
@@ -57,6 +55,7 @@ const path = require("path")
 app.set("views", path.join(__dirname, "views"))
 app.set("view engine", "ejs")
 
+// validation middleware
 const validateCampground = (req, res, next) => {
   console.log("VALIDANDO")
   const { error } = campgroundSchema.validate(req.body)
@@ -72,9 +71,8 @@ app.listen(3000, () => {
   console.log("LISTENING ON PORT 3000")
 })
 
-// session & flash
+// session 
 const session = require('express-session')
-const flash = require('connect-flash')
 const sessionConfig = {
   secret: "improveSecret",
   resave: false,
@@ -86,6 +84,8 @@ const sessionConfig = {
   }
 }
 app.use(session(sessionConfig))
+// flash
+const flash = require('connect-flash')
 app.use(flash())
 //flash middelware
 app.use((req, res, next) => {
@@ -95,9 +95,30 @@ app.use((req, res, next) => {
   next()
 })
 
+// passport
+const passport = require('passport')
+const LocalStrategy = require('passport-local')
+const User = require("./models/user")
+app.use(passport.initialize())
+app.use(passport.session())
+passport.use(new LocalStrategy(User.authenticate()))
+passport.serializeUser(User.serializeUser())
+passport.deserializeUser(User.deserializeUser())
+
 // home page
 app.get("/", (req, res) => {
   res.render("home.ejs")
+})
+
+//register new user
+app.get("/register", async (req, res) => {
+  res.render("users/register")
+})
+
+app.get("/fakeUser", async (req, res) => {
+  const user = new User({ email: "test@test.com", username: "testname" })
+  const newUser = await User.register(user, "testpassword")
+  res.send(newUser)
 })
 
 // public directory static files
