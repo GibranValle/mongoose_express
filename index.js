@@ -13,13 +13,11 @@ app.use(methodOverride("_method"))
 // router campground
 const campgroundsRouter = require('./routes/campgrounds')
 const reviewRouter = require('./routes/reviews')
+const userRouter = require("./routes/users")
 
 // error handling
 const appError = require("./utils/ExpressError")
 const catchAsync = require("./utils/catchAsync")
-
-//joi
-const { campgroundSchema, reviewSchema } = require("./validationSchemas.js")
 
 // mongoose models
 const Campground = require("./models/campground")
@@ -27,7 +25,6 @@ const Review = require("./models/review")
 
 //mongoose
 const mongoose = require("mongoose")
-const db = mongoose.connection
 const userName = 'admin'
 const password = 'admin'
 const dbName = 'test'
@@ -39,6 +36,7 @@ try {
     mongoAtlasUri, { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: true },
     () => console.log(" Mongoose is connected"),
   );
+  mongoose.set('useCreateIndex', true)
 } catch (e) {
   console.log("could not connect");
 }
@@ -54,18 +52,6 @@ app.engine("ejs", ejsMate)
 const path = require("path")
 app.set("views", path.join(__dirname, "views"))
 app.set("view engine", "ejs")
-
-// validation middleware
-const validateCampground = (req, res, next) => {
-  console.log("VALIDANDO")
-  const { error } = campgroundSchema.validate(req.body)
-  if (error) {
-    const msg = error.details.map((el) => el.message).join(",")
-    throw new appError(400, msg)
-  }
-  console.log("NEXT")
-  next()
-}
 
 app.listen(3000, () => {
   console.log("LISTENING ON PORT 3000")
@@ -84,16 +70,6 @@ const sessionConfig = {
   }
 }
 app.use(session(sessionConfig))
-// flash
-const flash = require('connect-flash')
-app.use(flash())
-//flash middelware
-app.use((req, res, next) => {
-  // load success message
-  res.locals.success = req.flash('success')
-  res.locals.error = req.flash('error')
-  next()
-})
 
 // passport
 const passport = require('passport')
@@ -105,20 +81,27 @@ passport.use(new LocalStrategy(User.authenticate()))
 passport.serializeUser(User.serializeUser())
 passport.deserializeUser(User.deserializeUser())
 
+// flash
+const flash = require('connect-flash')
+app.use(flash())
+//flash middelware
+app.use((req, res, next) => {
+  // load success message
+  res.locals.user = req.user
+  res.locals.success = req.flash('success')
+  res.locals.error = req.flash('error')
+  next()
+})
+
 // home page
 app.get("/", (req, res) => {
   res.render("home.ejs")
 })
 
-//register new user
-app.get("/register", async (req, res) => {
-  res.render("users/register")
-})
-
-app.get("/fakeUser", async (req, res) => {
-  const user = new User({ email: "test@test.com", username: "testname" })
-  const newUser = await User.register(user, "testpassword")
-  res.send(newUser)
+app.get('/logout', (req, res) => {
+  req.logOut()
+  req.flash('success', 'Goodbye')
+  res.redirect('/')
 })
 
 // public directory static files
@@ -128,6 +111,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use("/campgrounds", campgroundsRouter)
 // router reviews
 app.use('/campgrounds/:id/reviews', reviewRouter)
+// router users
+app.use("/", userRouter)
 
 app.all("*", (req, res, next) => {
   next(new appError(404, "Page not found"))
