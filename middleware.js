@@ -1,8 +1,12 @@
 // error handling
 const appError = require("./utils/ExpressError")
+const Campground = require('./models/campground')
+const Review = require("./models/review")
 
 module.exports.isLoggedIn = (req, res, next) => {
   if (!req.isAuthenticated()) {
+    //console.log(req.originalUrl)
+    //console.log(req.params.id, req.params.reviewId)
     req.session.returnTo = req.originalUrl
     req.flash('error', 'you must be logged in')
     return res.redirect('/login')
@@ -32,4 +36,24 @@ module.exports.validateReview = (req, res, next) => {
   } else {
     next()
   }
+}
+
+module.exports.isAuthor = async (req, res, next) => {
+  const { id } = req.params
+  const campground = await Campground.findById(id)
+  if (!campground.author.equals(req.user._id)) {
+    req.flash('error', 'missing authentication')
+    return res.redirect(`/campgrounds/${id}`)
+  }
+  next()
+}
+
+module.exports.isReviewAuthor = async (req, res, next) => {
+  const { id, reviewId } = req.params
+  const review = await Review.findById(reviewId)
+  if (!review.author.equals(req.user._id)) {
+    req.flash('error', 'missing authorization')
+    return res.redirect(`/campgrounds/${id}`)
+  }
+  next()
 }

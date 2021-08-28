@@ -9,47 +9,26 @@ const catchAsync = require("../utils/catchAsync")
 //mongoose model
 const User = require("../models/user")
 
+// controller functions
+const { renderRegisterForm, renderLoginForm, registerUser, logout, login } = require('../controller/user')
+
 //joi TODO
 
 //middlewares
-const { validateCampground } = require('../middleware')
-const { isLoggedIn } = require('../middleware')
+const { validateCampground, isLoggedIn } = require('../middleware')
 
 //passport
 const passport = require("passport")
 const { required } = require("joi")
 
-//routes
-router.get("/register", (req, res) => {
-  res.render("users/register")
-})
+router.route('/register')
+  .get(renderRegisterForm)
+  .post(catchAsync(registerUser))
 
-router.post("/register", catchAsync(async (req, res, next) => {
-  const { username, password, email } = req.body
-  const user = new User({ email, username })
-  try {
-    const newUser = await User.register(user, password)
-    user.login(newUser, err => {
-      if (err) return next(err)
-      req.flash('success', 'You have updated a campground')
-      res.redirect("/campgrounds")
-    })
-  } catch (e) {
-    req.flash("error", e.message)
-    res.redirect("/register")
-  }
-}))
+router.route('/login', )
+  .get(renderLoginForm)
+  .post(passport.authenticate('local', { failureFlash: true, failureRedirect: 'login' }), login)
 
-router.get("/login", (req, res) => {
-  res.render("users/login")
-})
-
-router.post("/login", passport.authenticate('local', { failureFlash: true, failureRedirect: 'login' }), (req, res) => {
-  req.flash('success', 'welcome back')
-  console.log(req.user)
-  const redirectUrl = req.session.returnTo || '/campgrounds'
-  delete req.session.returnTo
-  res.redirect(redirectUrl)
-})
+router.get('/logout', logout)
 
 module.exports = router

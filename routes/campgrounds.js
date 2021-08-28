@@ -10,72 +10,36 @@ const Campground = require("../models/campground")
 
 // MIDDLEWARE
 // valitation middleware JOI
-const { isLoggedIn, validateCampground } = require('../middleware')
+const { isLoggedIn, validateCampground, isAuthor } = require('../middleware')
 
-// all campgrounds
-router.get("/", catchAsync(async (req, res, next) => {
-  const campgrounds = await Campground.find({})
-  res.render("campgrounds/index", { campgrounds })
-}))
+// controller functions
+const {
+  index,
+  renderNewForm,
+  showCampground,
+  renderEditForm,
+  createCampground,
+  updateCampground,
+  deleteCampground
+} = require('../controller/campgrounds')
 
-// create campground form
-router.get("/new", isLoggedIn, (req, res) => {
-  res.render("campgrounds/new")
-})
+// upload image to cloudinary
+const multer = require('multer');
+const { storage } = require('../cloudinary')
+const upload = multer({ storage })
 
-// show details of one campground
-router.get("/:id", isLoggedIn, catchAsync(async (req, res) => {
-  const id = req.params.id
-  const campground = await Campground.findById(id).populate("reviews").populate('author')
-  if (!campground) {
-    req.flash('error', 'Cannot find the campground')
-    return res.redirect("/campgrounds")
-  }
-  res.render("campgrounds/show", { campground })
-}))
+router.route('/')
+  // all campgrounds
+  .get(catchAsync(index))
+  .post(isLoggedIn, upload.array('campground[image]'), validateCampground, catchAsync(createCampground))
 
-// edit campground form
-router.get("/:id/edit", isLoggedIn, catchAsync(async (req, res) => {
-  const id = req.params.id
-  const campground = await Campground.findById(id)
-  if (!campground) {
-    req.flash('error', 'Cannot find the campground')
-    return res.redirect("/campgrounds")
-  }
-  res.render("campgrounds/edit", { campground })
-}))
+router.get("/new", isLoggedIn, renderNewForm)
 
-// create New campground
-router.post("/", validateCampground, catchAsync(async (req, res, next) => {
-  const campground = new Campground(req.body.campground)
-  campground.author = req.user._id
-  await campground.save()
-  req.flash('success', 'You have updated a campground')
-  res.redirect(`/campgrounds/${campground._id}`)
-}))
+router.route('/:id')
+  .get(catchAsync(showCampground))
+  .put(isLoggedIn, isAuthor, upload.array('campground[image]'), catchAsync(updateCampground))
+  .delete(isLoggedIn, isAuthor, catchAsync(deleteCampground))
 
-// edit campground
-router.put("/:id", isLoggedIn, catchAsync(async (req, res, next) => {
-  const { id } = req.params
-  const campground = await Campground.findByIdAndUpdate(id, { ...req.body.campground, })
-  if (!campground) {
-    req.flash('error', 'Cannot find the campground')
-    return res.redirect("/campgrounds")
-  }
-  req.flash('success', 'You have updated a campground')
-  res.redirect(`/campgrounds/${campground._id}`)
-}))
-
-// delete one campground
-router.delete("/:id", isLoggedIn, catchAsync(async (req, res) => {
-  const { id } = req.params
-  const campground = await Campground.findByIdAndDelete(id)
-  if (!campground) {
-    req.flash('error', 'Cannot find the campground')
-    return res.redirect("/campgrounds")
-  }
-  req.flash('success', 'You have deleted a campground')
-  res.redirect("/campgrounds")
-}))
+router.get("/:id/edit", isLoggedIn, isAuthor, catchAsync(renderEditForm))
 
 module.exports = router
